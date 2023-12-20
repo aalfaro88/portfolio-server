@@ -8,6 +8,9 @@ const jwt = require("jsonwebtoken");
 const isAuthenticated = require("../middleware/isAuthenticated.js");
 const User = require("../models/User");
 
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 const saltRounds = 10;
 
 
@@ -101,6 +104,36 @@ router.post("/login", (req, res, next) => {
     })
     .catch((err) => res.status(500).json({ message: "Internal Server Error" }));
 });
+
+router.post('/google-login', async (req, res, next) => {
+    const { tokenId } = req.body;
+  
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: tokenId,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+  
+      const { email, name, picture } = payload;
+      console.log(payload)
+      const user = await User.findOneAndUpdate(
+        { email },
+        { email, name, picture },
+        { new: true, upsert: true } // Creates a new user if it doesn't exist
+      );
+  
+      const authToken = jwt.sign({ email: user.email, _id: user._id }, process.env.SECRET, {
+        algorithm: "HS256",
+        expiresIn: "6h",
+      });
+  
+      res.status(200).json({ authToken });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
 
 router.get("/verify", isAuthenticated, (req, res, next) => {
   res.status(200).json(req.user);
