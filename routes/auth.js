@@ -115,11 +115,11 @@ router.post('/google-login', async (req, res, next) => {
       });
       const payload = ticket.getPayload();
   
-      const { email, name, picture } = payload;
-      console.log(payload)
+      const { email, given_name, picture } = payload;
+      console.log("User connected")
       const user = await User.findOneAndUpdate(
         { email },
-        { email, name, picture },
+        { email, given_name, picture },
         { new: true, upsert: true } // Creates a new user if it doesn't exist
       );
   
@@ -138,5 +138,7 @@ router.post('/google-login', async (req, res, next) => {
 router.get("/verify", isAuthenticated, (req, res, next) => {
   res.status(200).json(req.user);
 });
+
+
 
 module.exports = router;

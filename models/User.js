@@ -9,14 +9,21 @@ const userSchema = new Schema(
       unique: true,
       required: true,
     },
-    password: {
+    given_name: {
       type: String,
       required: true,
     },
-    username: String,
-    randomize_tokens: {
+    username: {
+      type: String,
+      unique: true,
+      minlength: 3, // Minimum length of 3 characters
+      maxlength: 20, // Maximum length of 20 characters
+      match: /^[a-zA-Z0-9_]*$/,
+      default: undefined // Regular expression pattern for alphanumeric characters and underscores
+    },
+    max_points: {
       type: Number,
-      default: 0, 
+      default: 0
     },
   },
   {
@@ -25,4 +32,3 @@ const userSchema = new Schema(
 );
 
 module.exports = model('User', userSchema);
-

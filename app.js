@@ -1,6 +1,5 @@
 // app.js
 
-
 var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
@@ -10,7 +9,8 @@ var mongoose = require('mongoose');
 var cors = require('cors');
 
 var usersRouter = require('./routes/users');
-var authRouter = require('./routes/auth')
+var authRouter = require('./routes/auth');
+var dictionaryRouter = require('./routes/dictionary'); // Import the dictionary router
 
 var app = express();
 
@@ -27,14 +27,11 @@ app.use(
     cors({
       origin: [process.env.REACT_APP_URI]  // <== URL of our future React app
     })
-  );
-
-// app.use(
-//     cors()
-//   );
+);
 
 app.use('/users', usersRouter);
 app.use('/auth', authRouter);
+app.use('/dictionary', dictionaryRouter); // Add the dictionary router to handle requests to '/dictionary'
 
 mongoose
   .connect(process.env.MONGODB_URI)
@@ -44,6 +41,5 @@ mongoose
   .catch((err) => {
     console.error("Error connecting to mongo: ", err);
   });
-
 
 module.exports = app;
