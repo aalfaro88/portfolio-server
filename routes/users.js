@@ -51,4 +51,50 @@ router.post('/add-username', isAuthenticated, async (req, res) => {
   }
 });
 
+
+// POST route to update user's score if it's the highest
+router.post('/update-score', isAuthenticated, async (req, res) => {
+  const { score } = req.body;
+
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the current score is higher than the user's max_points
+    if (score > user.max_points) {
+      // Update the user's max_points and max_points_date
+      user.max_points = score;
+      user.max_points_date = new Date();
+      await user.save();
+
+      return res.status(200).json({ message: 'Score updated successfully' });
+    }
+
+    return res.status(200).json({ message: 'Score not updated' });
+  } catch (error) {
+    console.error('Error updating score:', error);
+    res.status(500).json({ error: 'An error occurred while updating the score' });
+  }
+});
+
+// GET route to fetch top scores, usernames, and dates
+router.get('/scores/top', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20; // Get the limit from the query parameter or use 20 as the default
+    const topScores = await User.find({}, 'username max_points max_points_date')
+      .sort({ max_points: -1, max_points_date: 1 })
+      .limit(limit);
+    
+    return res.status(200).json(topScores);
+  } catch (error) {
+    console.error('Error fetching top scores:', error);
+    res.status(500).json({ error: 'An error occurred while fetching top scores' });
+  }
+});
+
+
+
 module.exports = router;

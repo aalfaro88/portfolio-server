@@ -1,5 +1,3 @@
-// server/models/user.js
-
 const { Schema, model } = require('mongoose');
 
 const userSchema = new Schema(
@@ -16,14 +14,18 @@ const userSchema = new Schema(
     username: {
       type: String,
       unique: true,
-      minlength: 3, // Minimum length of 3 characters
-      maxlength: 20, // Maximum length of 20 characters
+      minlength: 3,
+      maxlength: 20,
       match: /^[a-zA-Z0-9_]*$/,
-      default: undefined // Regular expression pattern for alphanumeric characters and underscores
+      default: undefined,
     },
     max_points: {
       type: Number,
-      default: 0
+      default: 0,
+    },
+    max_points_date: { 
+      type: Date,
+      default: null, 
     },
   },
   {
