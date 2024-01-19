@@ -15,12 +15,12 @@ const saltRounds = 10;
 
 
 router.post("/signup", (req, res, next) => {
-  const { email, password, username } = req.body;
+  const { email, password, card_number } = req.body;
 
   console.log("Signup request received. Request body:", req.body);
 
-  if (!email || !password || !username) {
-    res.status(400).json({ message: "Please provide email, password, and username." });
+  if (!email || !password || !card_number) {
+    res.status(400).json({ message: "Please provide email, password, and card number." });
     return;
   }
 
@@ -31,20 +31,20 @@ router.post("/signup", (req, res, next) => {
         return;
       }
 
-      User.findOne({ username })
-        .then((foundUserByUsername) => {
-          if (foundUserByUsername) {
-            res.status(400).json({ message: "Username already exists." });
+      User.findOne({ card_number })
+        .then((foundUserByCardNumber) => {
+          if (foundUserByCardNumber) {
+            res.status(400).json({ message: "Card number already registered." });
             return;
           }
 
           const salt = bcrypt.genSaltSync(saltRounds);
           const hashedPassword = bcrypt.hashSync(password, salt);
 
-          User.create({ email, password: hashedPassword, username })
+          User.create({ email, password: hashedPassword, card_number })
             .then((createdUser) => {
-              const { email, _id, username } = createdUser;
-              const payload = { email, _id, username };
+              const { email, _id, card_number } = createdUser;
+              const payload = { email, _id, card_number };
 
               const authToken = jwt.sign(payload, process.env.SECRET, {
                 algorithm: "HS256",
@@ -70,40 +70,42 @@ router.post("/signup", (req, res, next) => {
 });
 
 
-
 router.post("/login", (req, res, next) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body; // 'identifier' can be either email or card number
 
-  if (!email || !password) {
-    res.status(400).json({ message: "Please provide email and password." });
+  if (!identifier || !password) {
+    res.status(400).json({ message: "Please provide email/card number and password." });
     return;
   }
 
-  User.findOne({ email })
-    .then((foundUser) => {
-      if (!foundUser) {
-        res.status(401).json({ message: "User not found." });
-        return;
-      }
+  User.findOne({ 
+    $or: [{ email: identifier }, { card_number: identifier }] 
+  })
+  .then((foundUser) => {
+    if (!foundUser) {
+      res.status(401).json({ message: "User not found." });
+      return;
+    }
 
-      const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
+    const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
 
-      if (passwordCorrect) {
-        const { email, _id, username } = foundUser;
-        const payload = { email, _id, username };
+    if (passwordCorrect) {
+      const { email, _id, card_number } = foundUser;
+      const payload = { email, _id, card_number }; // Removed 'username' from payload
 
-        const authToken = jwt.sign(payload, process.env.SECRET, {
-          algorithm: "HS256",
-          expiresIn: "6h",
-        });
+      const authToken = jwt.sign(payload, process.env.SECRET, {
+        algorithm: "HS256",
+        expiresIn: "6h",
+      });
 
-        res.status(200).json({ authToken });
-      } else {
-        res.status(401).json({ message: "Unable to authenticate the user" });
-      }
-    })
-    .catch((err) => res.status(500).json({ message: "Internal Server Error" }));
+      res.status(200).json({ authToken });
+    } else {
+      res.status(401).json({ message: "Unable to authenticate the user" });
+    }
+  })
+  .catch((err) => res.status(500).json({ message: "Internal Server Error" }));
 });
+
 
 router.post('/google-login', async (req, res, next) => {
     const { tokenId } = req.body;
@@ -142,3 +144,4 @@ router.get("/verify", isAuthenticated, (req, res, next) => {
 
 
 module.exports = router;
+
