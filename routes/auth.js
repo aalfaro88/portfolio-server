@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 
 const isAuthenticated = require("../middleware/isAuthenticated.js");
 const User = require("../models/User");
+const BankUser = require("../models/BankUser");
+
 
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -24,14 +26,14 @@ router.post("/signup", (req, res, next) => {
     return;
   }
 
-  User.findOne({ email })
+  BankUser.findOne({ email })
     .then((foundUserByEmail) => {
       if (foundUserByEmail) {
         res.status(400).json({ message: "Email already registered." });
         return;
       }
 
-      User.findOne({ card_number })
+      BankUser.findOne({ card_number })
         .then((foundUserByCardNumber) => {
           if (foundUserByCardNumber) {
             res.status(400).json({ message: "Card number already registered." });
@@ -41,7 +43,7 @@ router.post("/signup", (req, res, next) => {
           const salt = bcrypt.genSaltSync(saltRounds);
           const hashedPassword = bcrypt.hashSync(password, salt);
 
-          User.create({ email, password: hashedPassword, card_number })
+          BankUser.create({ email, password: hashedPassword, card_number })
             .then((createdUser) => {
               const { email, _id, card_number } = createdUser;
               const payload = { email, _id, card_number };
@@ -71,40 +73,52 @@ router.post("/signup", (req, res, next) => {
 
 
 router.post("/login", (req, res, next) => {
-  const { identifier, password } = req.body; // 'identifier' can be either email or card number
+  const { identifier, password } = req.body;
+  console.log("Login Request Body:", req.body);
 
   if (!identifier || !password) {
+    console.log("Missing credentials");
     res.status(400).json({ message: "Please provide email/card number and password." });
     return;
   }
 
-  User.findOne({ 
+  console.log(`Attempting to find user by identifier: ${identifier}`);
+  BankUser.findOne({ 
     $or: [{ email: identifier }, { card_number: identifier }] 
   })
   .then((foundUser) => {
     if (!foundUser) {
+      console.log(`User not found with identifier: ${identifier}`);
       res.status(401).json({ message: "User not found." });
       return;
     }
 
+    console.log(`User found. Verifying password for user: ${foundUser.email}`);
     const passwordCorrect = bcrypt.compareSync(password, foundUser.password);
 
     if (passwordCorrect) {
       const { email, _id, card_number } = foundUser;
-      const payload = { email, _id, card_number }; // Removed 'username' from payload
+      console.log(`Password correct. Generating token for user: ${email}`);
+      const payload = { email, _id, card_number }; 
 
       const authToken = jwt.sign(payload, process.env.SECRET, {
         algorithm: "HS256",
         expiresIn: "6h",
       });
 
+      console.log(`Token generated for user: ${email}`);
       res.status(200).json({ authToken });
     } else {
+      console.log(`Incorrect password for user: ${foundUser.email}`);
       res.status(401).json({ message: "Unable to authenticate the user" });
     }
   })
-  .catch((err) => res.status(500).json({ message: "Internal Server Error" }));
+  .catch((err) => {
+    console.error("Error in login process:", err);
+    res.status(500).json({ message: "Internal Server Error" });
+  });
 });
+
 
 
 router.post('/google-login', async (req, res, next) => {

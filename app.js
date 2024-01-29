@@ -10,7 +10,8 @@ var cors = require('cors');
 
 var usersRouter = require('./routes/users');
 var authRouter = require('./routes/auth');
-var dictionaryRouter = require('./routes/dictionary'); // Import the dictionary router
+var dictionaryRouter = require('./routes/dictionary'); 
+var bankRouter = require('./routes/bank')
 
 var app = express();
 
@@ -25,13 +26,14 @@ app.enable('trust proxy');
 
 app.use(
     cors({
-      origin: [process.env.REACT_APP_URI]  // <== URL of our future React app
+      origin: [process.env.REACT_APP_URI]  
     })
 );
 
 app.use('/users', usersRouter);
 app.use('/auth', authRouter);
-app.use('/dictionary', dictionaryRouter); // Add the dictionary router to handle requests to '/dictionary'
+app.use('/dictionary', dictionaryRouter);
+app.use('/bank',bankRouter);
 
 mongoose
   .connect(process.env.MONGODB_URI)
