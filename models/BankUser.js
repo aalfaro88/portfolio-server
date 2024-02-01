@@ -30,6 +30,10 @@ const bankUserSchema = new Schema(
       type: Number,
       default: 0,
     },
+    investment_timestamp: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
