@@ -72,30 +72,52 @@ router.post('/deposit-to-investment', isAuthenticated, async (req, res) => {
   
 // Withdraw funds from investment account
 router.post('/withdraw-from-investment', isAuthenticated, async (req, res) => {
-    const { amount } = req.body; 
-    const userId = req.user._id; // Retrieved from the token after authentication
-  
+    const { amount } = req.body; // The rounded amount to be withdrawn
+    const userId = req.user._id;
+
+    console.log(`Received amount to withdraw: ${amount}`); // Log received amount to withdraw
+
     try {
-      const account = await BankUser.findById(userId);
-  
-      if (!account) {
-        return res.status(404).json({ message: "Account not found." });
-      }
-  
-      if (account.investment_funds < amount) {
-        return res.status(400).json({ message: "Insufficient investment funds." });
-      }
-  
-      account.investment_funds -= amount;
-      account.funds += amount;
-  
-      await account.save();
-  
-      res.status(200).json({ message: "Withdrawal successful.", funds: account.funds, investmentFunds: account.investment_funds });
+        const account = await BankUser.findById(userId);
+
+        if (!account) {
+            return res.status(404).json({ message: "Account not found." });
+        }
+
+        console.log(`Account investment funds before operation: ${account.investment_funds}`); // Log the investment funds before operation
+
+        // Calculate the minutes elapsed since the last investment timestamp
+        const now = new Date();
+        const lastInvestmentTimestamp = new Date(account.investment_timestamp).getTime();
+        const minutesElapsed = Math.floor((now.getTime() - lastInvestmentTimestamp) / (1000 * 60)); // Convert milliseconds to minutes
+
+        const growthRatePerMinute = 0.05; // Define the growth rate per minute
+        const currentTotalWithProfits = parseFloat((account.investment_funds * Math.pow(1 + growthRatePerMinute, minutesElapsed)).toFixed(2));
+
+        console.log(`Calculated currentTotalWithProfits: ${currentTotalWithProfits}`); // Log the calculated current total with profits
+
+        if (currentTotalWithProfits < amount) {
+            console.log(`Error during withdrawal: Insufficient investment funds. Trying to withdraw ${amount}, but only ${currentTotalWithProfits} is available.`);
+            return res.status(400).json({ message: "Insufficient investment funds." });
+        }
+
+        account.investment_funds = currentTotalWithProfits - amount; // Update investment funds
+        account.funds += amount; // Add the amount to the funds
+        account.investment_timestamp = new Date();
+
+        await account.save();
+
+        console.log(`Account investment funds after operation: ${account.investment_funds}`); // Log the investment funds after operation
+
+        res.status(200).json({ message: "Withdrawal successful.", funds: account.funds, investmentFunds: account.investment_funds });
     } catch (error) {
-      res.status(500).json({ message: "Internal Server Error" });
+        console.log(`Error during withdrawal: ${error.message}`); // Log the error message
+        res.status(500).json({ message: "Internal Server Error" });
     }
-  });
+});
+
+
+
 
   // Update investment funds before withdrawal
 router.post('/update-investment-funds', isAuthenticated, async (req, res) => {
@@ -137,8 +159,8 @@ router.get('/funds', isAuthenticated, async (req, res) => {
     }
   });
 
-  // GET user's investment funds
-  router.get('/investment-funds', isAuthenticated, async (req, res) => {
+// GET user's investment funds
+router.get('/investment-funds', isAuthenticated, async (req, res) => {
     try {
       const userId = req.user._id; 
       const user = await BankUser.findById(userId);
@@ -147,18 +169,16 @@ router.get('/funds', isAuthenticated, async (req, res) => {
         return res.status(404).json({ message: "User not found." });
       }
   
-      const now = new Date();
-      const timeElapsed = now - user.investment_timestamp; // Time elapsed in milliseconds
-      const growthRate = 0.0001; // 0.01% growth rate per second
-      const secondsElapsed = timeElapsed / 1000;
-      const growthFactor = Math.pow(1 + growthRate, secondsElapsed);
-      const updatedInvestmentFunds = user.investment_funds * growthFactor;
-  
-      res.status(200).json({ investmentFunds: updatedInvestmentFunds });
+      // Send user's current investment funds and the timestamp of the last investment
+      res.status(200).json({ 
+        investmentFunds: user.investment_funds,
+        lastInvestmentTimestamp: user.investment_timestamp // Send this timestamp
+      });
     } catch (error) {
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
+  
   
   
 
