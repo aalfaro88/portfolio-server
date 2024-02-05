@@ -92,30 +92,66 @@ router.post('/withdraw-from-investment', isAuthenticated, async (req, res) => {
         const minutesElapsed = Math.floor((now.getTime() - lastInvestmentTimestamp) / (1000 * 60)); // Convert milliseconds to minutes
 
         const growthRatePerMinute = 0.05; // Define the growth rate per minute
-        const currentTotalWithProfits = parseFloat((account.investment_funds * Math.pow(1 + growthRatePerMinute, minutesElapsed)).toFixed(2));
+        let currentTotalWithProfits = parseFloat((account.investment_funds * Math.pow(1 + growthRatePerMinute, minutesElapsed)).toFixed(2));
 
-        console.log(`Calculated currentTotalWithProfits: ${currentTotalWithProfits}`); // Log the calculated current total with profits
-
-        if (currentTotalWithProfits < amount) {
+        if (currentTotalWithProfits >= 10000000) {
+            // If profit exceeds or reaches the cap, transfer 10,000,000 to savings and reset investment funds
+            account.funds += 10000000;
+            account.investment_funds = 0;
+        } else if (currentTotalWithProfits < amount) {
             console.log(`Error during withdrawal: Insufficient investment funds. Trying to withdraw ${amount}, but only ${currentTotalWithProfits} is available.`);
             return res.status(400).json({ message: "Insufficient investment funds." });
+        } else {
+            // Normal withdrawal operation
+            account.investment_funds = currentTotalWithProfits - amount;
+            account.funds += amount;
         }
 
-        account.investment_funds = currentTotalWithProfits - amount; // Update investment funds
-        account.funds += amount; // Add the amount to the funds
         account.investment_timestamp = new Date();
-
         await account.save();
 
-        console.log(`Account investment funds after operation: ${account.investment_funds}`); // Log the investment funds after operation
+        console.log(`Account funds after operation: ${account.funds}`);
+        console.log(`Account investment funds after operation: ${account.investment_funds}`);
 
-        res.status(200).json({ message: "Withdrawal successful.", funds: account.funds, investmentFunds: account.investment_funds });
+        res.status(200).json({ message: "Operation successful.", funds: account.funds, investmentFunds: account.investment_funds });
     } catch (error) {
-        console.log(`Error during withdrawal: ${error.message}`); // Log the error message
+        console.log(`Error during operation: ${error.message}`);
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
 
+router.post('/check-investment-cap', isAuthenticated, async (req, res) => {
+    const userId = req.user._id;
+
+    try {
+        const account = await BankUser.findById(userId);
+
+        if (!account) {
+            return res.status(404).json({ message: "Account not found." });
+        }
+
+        // Calculate the current total with profit
+        const now = new Date();
+        const lastInvestmentTimestamp = new Date(account.investment_timestamp).getTime();
+        const minutesElapsed = Math.floor((now.getTime() - lastInvestmentTimestamp) / (1000 * 60));
+        const currentTotalWithProfits = parseFloat((account.investment_funds * Math.pow(1 + 0.05, minutesElapsed)).toFixed(2));
+
+        // Check if the current total with profit exceeds the cap
+        if (currentTotalWithProfits >= 10000000) {
+            account.funds += 10000000; // Transfer the capped amount to savings
+            account.investment_funds = 0; // Reset the investment funds to 0
+            account.investment_timestamp = now; // Update the investment timestamp
+            await account.save();
+
+            res.status(200).json({ message: "Cap exceeded. Funds transferred to savings.", funds: account.funds, investmentFunds: account.investment_funds });
+        } else {
+            res.status(200).json({ message: "Cap not exceeded.", funds: account.funds, investmentFunds: account.investment_funds });
+        }
+    } catch (error) {
+        console.log(`Error during operation: ${error.message}`);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
 
 
 
@@ -132,9 +168,10 @@ router.post('/update-investment-funds', isAuthenticated, async (req, res) => {
       }
   
       // Update the investment funds in the account
-      account.investment_funds = investmentFunds;
+      const updatedInvestmentFunds = Math.min(investmentFunds, 10000000);
+      account.investment_funds = updatedInvestmentFunds;
       await account.save();
-  
+
       res.status(200).json({ message: "Investment funds updated successfully.", investmentFunds: account.investment_funds });
     } catch (error) {
       res.status(500).json({ message: "Internal Server Error", error: error.message });
